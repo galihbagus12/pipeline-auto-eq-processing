@@ -1,0 +1,32 @@
+# ============================================================
+# 1D layered velocity model -- East Java (Jatim) network
+#
+# NLLoc LAYER format, one layer per line:
+#   LAYER  depth_top_km  Vp_km_s  Vp_grad  Vs_km_s  Vs_grad  density_g_cm3  density_grad
+#
+# depth_top_km is the top of the layer, positive downwards (negative values
+# are above sea level). All gradients are 0 -- each layer is homogeneous, no
+# within-layer velocity/density gradient.
+#
+# This is the single source of truth for the layered model: hypocenter_locator/
+# locator.py parses it directly into NLLoc's LAYER control lines and its own
+# CONFIG['velocity_model'] list; relocation.py parses the same file for the
+# P velocity/depth layers it needs (hypoDD uses a single constant Vp/Vs ratio
+# instead of a layered Vs profile -- see relocation's own 'vpvs_ratio' in
+# config.yaml). association.py instead assumes a homogeneous Vp/Vs (see its
+# 'vp'/'vpvs_ratio' in config.yaml) -- a deliberate simplification for the
+# associator, not derived from this file.
+#
+# Origin: the prior hand-run NonLinLoc setup for this network
+# (nonlinlocooo/input/jatim.in on the machine that produced it).
+# ============================================================
+LAYER    -3.00   2.238  0.00   1.294  0.00   2.176  0.00
+LAYER     0.00   2.238  0.00   1.294  0.00   2.176  0.00
+LAYER     1.00   3.085  0.00   1.783  0.00   2.321  0.00
+LAYER     2.00   4.456  0.00   2.576  0.00   2.368  0.00
+LAYER    20.00   6.500  0.00   3.850  0.00   2.920  0.00
+LAYER    35.00   8.040  0.00   4.480  0.00   3.320  0.00
+LAYER    77.50   8.050  0.00   4.490  0.00   3.350  0.00
+LAYER   120.00   8.050  0.00   4.500  0.00   3.370  0.00
+LAYER   165.00   8.175  0.00   4.684  0.00   3.370  0.00
+LAYER   210.00   8.300  0.00   4.770  0.00   3.370  0.00

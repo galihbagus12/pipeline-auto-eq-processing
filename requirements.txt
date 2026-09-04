@@ -1,0 +1,39 @@
+# End-to-End Automated Seismic Processing Pipeline -- Python dependencies
+# for every stage (prepro, pick, association, locator, relocation, magnitud).
+#
+# One venv is enough: the picking stage's SeisBench/torch stack and the
+# association/location/relocation/magnitude stack were previously kept in
+# two separate conda envs, but both stacks are confirmed to coexist in one
+# environment (this project's own 'obspy' conda env already has pyocto
+# installed alongside torch/seisbench with no conflict) -- pinned here as one
+# list. Install with:
+#   python -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements.txt
+#
+# Two Python packages below need an external, non-pip prerequisite -- see
+# README.md's Install section:
+#   - torch:  installs a CPU build from plain PyPI. For the CUDA 12.1 build
+#     this project was validated on, install instead with:
+#       pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+#   - pygmt:  wraps the GMT C library, which is not on PyPI. Install GMT
+#     first (e.g. `sudo apt install gmt` or `conda install -c conda-forge gmt`),
+#     then `pip install pygmt` will find it.
+
+obspy==1.5.0
+numpy==1.26.4
+pandas==2.3.3
+scipy==1.15.2
+matplotlib==3.10.9
+pyyaml==6.0.3
+tqdm==4.67.3
+geopy==2.4.1
+pyproj==3.7.1
+pyocto==0.1.10
+pygmt==0.13.0
+seisbench==0.11.6
+torch==2.5.1
+
+# Non-pip dependencies, installed separately (see README.md's Install section):
+#   - NonLinLoc binaries (Vel2Grid, Grid2Time, NLLoc) on PATH
+#   - relocDD-py vendored at relocation.relocdd_py_dir (config/config.yaml)
+#   - GMT C library (required by pygmt, see note above)
