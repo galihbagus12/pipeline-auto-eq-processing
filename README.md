@@ -207,6 +207,9 @@ the underlying tools:
   al., [relocDD-py](https://github.com/katie-biegel/relocDD-py).
 - **Local magnitude (Wood-Anderson / ML)** — L. K. Hutton & D. M. Boore
   (1987), *The ML scale in southern California*, BSSA.
+- **FocoNet** — X. Song, M.-A. Meier, W. L. Ellsworth, & G. C. Beroza (2026),
+  *FocoNet: Transformer-based focal-mechanism determination*, Journal of
+  Geophysical Research: Machine Learning and Computation, 3, e2025JH000879.
 - **ObsPy** — M. Beyreuther et al. (2010), *ObsPy: A Python toolbox for
   seismology*, Seismological Research Letters.
 
