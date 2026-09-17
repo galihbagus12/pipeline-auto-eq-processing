@@ -1,5 +1,5 @@
 # End-to-End Automated Seismic Processing Pipeline -- Python dependencies
-# for every stage (prepro, pick, association, locator, relocation, magnitud).
+# for every stage (prepro, pick, association, locator, relocation, magnitud, focmech).
 #
 # One venv is enough: the picking stage's SeisBench/torch stack and the
 # association/location/relocation/magnitude stack were previously kept in
@@ -32,6 +32,7 @@ pyocto==0.1.10
 pygmt==0.13.0
 seisbench==0.11.6
 torch==2.5.1
+foconet==1.1.2
 
 # Non-pip dependencies, installed separately (see README.md's Install section):
 #   - NonLinLoc binaries (Vel2Grid, Grid2Time, NLLoc) on PATH

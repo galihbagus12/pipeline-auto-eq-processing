@@ -32,12 +32,12 @@ network: "3M"
 preprocessing:
   # --- Main paths ---
   raw_root_dir: "/media/galih/MyBackUp 2024/AusPass_Jatim"
-  output_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing"
+  output_folder: "output/preprocessing"
 
   # Same name/format as the prior run that produced this project's existing
   # preprocessed data -- keeping it lets a fresh run resume from that run's
   # progress instead of redoing already-finished station-days.
-  checkpoint_file: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing/checkpoint_merge_filter.json"
+  checkpoint_file: "output/preprocessing/checkpoint_merge_filter.json"
 
   network: "3M"   # AUSPASS network code, adjust if the source changes
 
@@ -123,12 +123,12 @@ preprocessing:
 # ------------------------------------------------------------
 picking:
   # --- Main paths ---
-  input_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing"
-  output_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/picking"
-  stations_file: "/media/galih/MyBackUp 2024/Jatim_new/stations.txt"
+  input_folder: "output/preprocessing"
+  output_folder: "output/picking"
+  stations_file: "stations.txt"
 
   # --- Checkpoint (process resume) ---
-  checkpoint_file: "/media/galih/MyBackUp 2024/Jatim_new/output/picking/checkpoint.json"
+  checkpoint_file: "output/picking/checkpoint.json"
 
   # --- Combined CSV (appended per file, resumable) ---
   # Final path: <output_folder>/summary/<combined_csv_name>
@@ -183,10 +183,10 @@ picking:
 # ------------------------------------------------------------
 association:
   # --- Main paths ---
-  picks_csv: "/media/galih/MyBackUp 2024/Jatim_new/output/picking/summary/ALL_results_combined.csv"
-  stations_file: "/media/galih/MyBackUp 2024/Jatim_new/stations.txt"
-  waveform_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing"
-  output_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/association"
+  picks_csv: "output/picking/summary/ALL_results_combined.csv"
+  stations_file: "stations.txt"
+  waveform_folder: "output/preprocessing"
+  output_folder: "output/association"
 
   # --- Checkpoint: the ONLY progress tracker ---
   # Holds two lists:
@@ -198,7 +198,7 @@ association:
   #
   # Delete this file (or start without one) -> EVERYTHING restarts from zero:
   # the stale association CSVs are removed and all days are re-associated.
-  checkpoint_file: "/media/galih/MyBackUp 2024/Jatim_new/output/association/checkpoint.json"
+  checkpoint_file: "output/association/checkpoint.json"
 
   # --- PICK FILTERING (before the associator) ---
   #
@@ -507,15 +507,15 @@ hypocenter_locator:
   # Output of association.py. Both the per-event .pick files and the search
   # volume handed over by that stage live under this directory, so the two
   # stages connect with no manual step in between.
-  association_nll_dir: "/media/galih/MyBackUp 2024/Jatim_new/output/association/nonlinloc"
+  association_nll_dir: "output/association/nonlinloc"
 
-  stations_file: "/media/galih/MyBackUp 2024/Jatim_new/stations.txt"
-  output_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/hypocenter_locator"
+  stations_file: "stations.txt"
+  output_folder: "output/hypocenter_locator"
 
   # --- Checkpoint: the only progress tracker ---
   # Holds which travel-time grids were built and which events were located.
   # Delete the file to force everything to be rebuilt from scratch.
-  checkpoint_file: "/media/galih/MyBackUp 2024/Jatim_new/output/hypocenter_locator/checkpoint.json"
+  checkpoint_file: "output/hypocenter_locator/checkpoint.json"
 
   # Travel-time grids are expensive to build but reusable across runs.
   # true -> delete and rebuild them even if they already exist.
@@ -538,7 +538,7 @@ hypocenter_locator:
   # Single source of truth: config/vel_model/jatim_velocity_model.txt
   # (NLLoc LAYER format). locator.py parses it into CONFIG['velocity_model']
   # (a list of (depth_top_km, Vp_km_s, Vs_km_s, density) tuples) at load time.
-  velocity_model_file: "/media/galih/MyBackUp 2024/Jatim_new/config/vel_model/jatim_velocity_model.txt"
+  velocity_model_file: "config/vel_model/jatim_velocity_model.txt"
 
   # --- Travel-time grid generation ---
   #
@@ -617,7 +617,7 @@ hypocenter_locator:
   qc_median_metrics: ["err_h_km", "err_z_km", "azimuthal_gap", "pdf_volume_km3"]
 
   # Used only to read the sampling rate when qc_sampling_rate is null.
-  waveform_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing"
+  waveform_folder: "output/preprocessing"
 
   # --- Plot settings ---
   plot_summary: true
@@ -649,12 +649,12 @@ hypocenter_locator:
 # ------------------------------------------------------------
 relocation:
   # --- Main paths ---
-  catalog_csv: "/media/galih/MyBackUp 2024/Jatim_new/output/hypocenter_locator/csv/hypocenter_catalog.csv"
-  phases_csv: "/media/galih/MyBackUp 2024/Jatim_new/output/hypocenter_locator/csv/hypocenter_phases.csv"
-  stations_file: "/media/galih/MyBackUp 2024/Jatim_new/stations.txt"
-  waveform_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing"
-  output_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/relocation"
-  relocdd_py_dir: "/media/galih/MyBackUp 2024/Jatim_new/output/relocation/relocDD-py"
+  catalog_csv: "output/hypocenter_locator/csv/hypocenter_catalog.csv"
+  phases_csv: "output/hypocenter_locator/csv/hypocenter_phases.csv"
+  stations_file: "stations.txt"
+  waveform_folder: "output/preprocessing"
+  output_folder: "output/relocation"
+  relocdd_py_dir: "output/relocation/relocDD-py"
 
   # Only relocate events that passed locator.py's QC (qc_pass column).
   # If locator.py ran with run_qc=false, every event is qc_pass=true and
@@ -670,7 +670,7 @@ relocation:
   # parsed from the same config/vel_model/jatim_velocity_model.txt used by
   # locator.py, so both stages search with the same physical model.
   vpvs_ratio: 1.73
-  velocity_model_file: "/media/galih/MyBackUp 2024/Jatim_new/config/vel_model/jatim_velocity_model.txt"
+  velocity_model_file: "config/vel_model/jatim_velocity_model.txt"
 
   # --- MAXSEPE: max hypocentral separation for event pairing ---
   #
@@ -782,16 +782,16 @@ relocation:
 # ------------------------------------------------------------
 magnitud:
   # --- Main paths ---
-  reloc_summary_csv: "/media/galih/MyBackUp 2024/Jatim_new/output/relocation/hypocenter_relocated_summary.csv"
-  phase_dat: "/media/galih/MyBackUp 2024/Jatim_new/output/relocation/phase.dat"
-  stations_file: "/media/galih/MyBackUp 2024/Jatim_new/stations.txt"
-  waveform_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing"
-  output_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/magnitud"
+  reloc_summary_csv: "output/relocation/hypocenter_relocated_summary.csv"
+  phase_dat: "output/relocation/phase.dat"
+  stations_file: "stations.txt"
+  waveform_folder: "output/preprocessing"
+  output_folder: "output/magnitud"
 
   # Cached StationXML responses (fetched once, then reused). Seeded from the
   # prior jatim_aus study for stations sharing the same network/instruments;
   # any station missing here is fetched from AUSPASS_FDSN_URL on first use.
-  xml_cache_dir: "/media/galih/MyBackUp 2024/Jatim_new/output/magnitud/StationXML_3M"
+  xml_cache_dir: "output/magnitud/StationXML_3M"
 
   network: "3M"
   auspass_fdsn_url: "http://auspass.edu.au"
@@ -843,7 +843,7 @@ magnitud:
 
   # --- Deliverable event/magnitude map (PyGMT) ---
   plot_map: true
-  map_output_path: "/media/galih/MyBackUp 2024/Jatim_new/output/magnitud/summary/event_magnitude_map.png"
+  map_output_path: "output/magnitud/summary/event_magnitude_map.png"
 
   # Optional independent catalogue overlay (e.g. ISC), plotted as stars.
   # null -> layer skipped. Expected columns: latitude, longitude, magnitude, depth_km.
@@ -905,19 +905,19 @@ focal_mechanism:
   enabled: true
   # --- Main paths ---
   # Use relocated_catalog.csv (which contains event_id) rather than hypocenter_relocated_summary.csv
-  relocated_catalog_csv: "/media/galih/MyBackUp 2024/Jatim_new/output/relocation/relocated_catalog.csv"
-  phases_csv: "/media/galih/MyBackUp 2024/Jatim_new/output/hypocenter_locator/csv/hypocenter_phases.csv"
-  stations_file: "/media/galih/MyBackUp 2024/Jatim_new/stations.txt"
-  waveform_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/preprocessing"
-  output_folder: "/media/galih/MyBackUp 2024/Jatim_new/output/focal_mechanism"
+  relocated_catalog_csv: "output/relocation/relocated_catalog.csv"
+  phases_csv: "output/hypocenter_locator/csv/hypocenter_phases.csv"
+  stations_file: "stations.txt"
+  waveform_folder: "output/preprocessing"
+  output_folder: "output/focal_mechanism"
   
   # --- FocoNet config ---
-  variant: "O"
+  variant: "Full"
   device: "cpu"
   batch_size: 64
   # Path to the FocoNet weights. FocoNet architecture is native in focmech.py.
   # The default model checkpoint is saved within the repository
-  checkpoint_path: "/media/galih/MyBackUp 2024/Jatim_new/config/vel_model/FocoNet_O.pth"
+  checkpoint_path: "config/vel_model/FocoNet_Full.pth"
 
 
   # --- Bandpass and windows ---
@@ -928,9 +928,9 @@ focal_mechanism:
   post_pick_s: 4.0
   polarity_search_s: 0.3
   polarity_aic_window_s: 0.4
-  polarity_min_confidence: 0.67
-  polarity_min_snr_log10: 0.3
-  min_polarities: 4
+  polarity_min_confidence: 0.0
+  polarity_min_snr_log10: -99.0
+  min_polarities: 1
   depth_clip_km: [0.0, 100.0]
 
   # --- Plotting ---

@@ -1,4 +1,4 @@
-![End-to-End Automated Seismic Processing Pipeline for Earthquake Detection, Relocation, and Magnitude Estimation](Repo%20Banner-selection.png)
+![End-to-End Automated Seismic Processing Pipeline for Earthquake Detection, Relocation, and Magnitude Estimation](repo_banner_new.png)
 
 # End-to-End Automated Seismic Processing Pipeline
 
@@ -27,6 +27,7 @@ days, so every stage is checkpoint/resume-based.
 | 3 | Location | `scripts/locator.py` | `pyocto` | `output/hypocenter_locator/` |
 | 4 | Relocation | `scripts/relocation.py` | `pyocto` | `output/relocation/` |
 | 5 | Magnitude | `scripts/magnitud.py` | `pyocto` | `output/magnitud/` |
+| 6 | Focal Mechanism | `scripts/focmech.py` | `pyocto` | `output/focal_mechanism/` |
 
 ```
 AusPass_Jatim/<date>/<date>_<STA>_<CH>.mseed   (raw input, one file per channel)
@@ -49,6 +50,11 @@ output/relocation/relocated_catalog.csv
         │
         ▼  magnitud.py        Wood-Anderson local magnitude (ML) + event/magnitude map
 output/magnitud/csv/ml_event_magnitudes.csv
+        │
+        ▼  focmech.py         FocONet focal mechanism estimation + Kagan angle pairing
+output/focal_mechanism/focal_mechanisms.csv
+output/focal_mechanism/kagan_pairs.csv
+output/focal_mechanism/plots/*.png
 ```
 
 1. **Preprocessing** (`prepro.py`) — merges per-channel raw files into 3-component
@@ -76,6 +82,10 @@ output/magnitud/csv/ml_event_magnitudes.csv
    amplitude near each S pick, computes per-station local magnitude (Hutton &
    Boore, 1987) and the event ML (median over stations), and renders the final
    deliverable event/magnitude map (PyGMT).
+7. **Focal Mechanism** (`focmech.py`) — runs the FocONet deep-learning model to
+   estimate focal mechanisms (strike, dip, rake) directly from 3-component
+   waveforms for relocated events. Computes Kagan angles between all event pairs
+   and plots focal mechanisms (beachballs).
 
 See `CLAUDE.md` for the full architecture reference (per-stage config keys,
 derived-parameter formulas, QC rationale) and `ASSOCIATION_QC.md` for a
@@ -87,7 +97,7 @@ Every stage is controlled by one shared file, `config/config.yaml` — no
 script has CLI flags, and no script needs to be edited for a parameter
 change. Each script loads its own top-level section by the same key as its
 stage name (`preprocessing:`, `picking:`, `association:`, `hypocenter_locator:`,
-`relocation:`, `magnitud:`), plus a shared top-level `network:` code.
+`relocation:`, `magnitud:`, `focal_mechanism:`), plus a shared top-level `network:` code.
 
 Two things are notable about how it works:
 
@@ -161,7 +171,7 @@ config/
   config.yaml                  # all tunable parameters (single source of truth)
   vel_model/                   # NonLinLoc-format velocity model
 scripts/                       # one script per pipeline stage
-  prepro.py  pick.py  association.py  locator.py  relocation.py  magnitud.py
+  prepro.py  pick.py  association.py  locator.py  relocation.py  magnitud.py  focmech.py
 pipeline.py                    # central control script / interactive menu
 stations.txt                   # station metadata (station, lat, lon, elevation_m)
 output/                        # all run artefacts, one subfolder per stage (gitignored)

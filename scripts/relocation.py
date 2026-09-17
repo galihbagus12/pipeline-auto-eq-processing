@@ -121,7 +121,7 @@ def load_layer_arrays_from_file(path):
     return layer_top_km, layer_vp_km_s
 
 
-CONFIG_YAML_PATH = "/media/galih/MyBackUp 2024/Jatim_new/config/config.yaml"
+CONFIG_YAML_PATH = str(Path(__file__).resolve().parent.parent / "config" / "config.yaml")
 
 with open(CONFIG_YAML_PATH, 'r') as _f:
     _all_cfg = yaml.safe_load(_f)

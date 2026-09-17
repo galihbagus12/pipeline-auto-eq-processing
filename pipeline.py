@@ -72,15 +72,38 @@ with open(CONFIG_YAML_PATH, 'r') as _f:
 
 # Project-local venv (see requirements.txt / README.md) -- when present,
 # resolve_interpreter() uses this for every step instead of ENV_PYTHON below.
-VENV_PYTHON = os.path.join(PROJECT_ROOT, '.venv', 'bin', 'python')
+def _get_venv_python():
+    candidates = [
+        os.path.join(PROJECT_ROOT, '.venv', 'Scripts', 'python.exe'),
+        os.path.join(PROJECT_ROOT, '.venv', 'bin', 'python'),
+        os.path.join(PROJECT_ROOT, '.venv', 'bin', 'python.exe'),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return os.path.join(
+        PROJECT_ROOT,
+        '.venv',
+        'Scripts' if sys.platform == 'win32' else 'bin',
+        'python.exe' if sys.platform == 'win32' else 'python'
+    )
+
+VENV_PYTHON = _get_venv_python()
 
 # Conda environment -> interpreter, matching CLAUDE.md's "Environment / running"
 # table exactly. Fallback used only when VENV_PYTHON doesn't exist. Add an
 # entry here before adding a step that needs a new conda env.
-ENV_PYTHON = {
-    'pyocto': "/home/galih/miniconda3/envs/pyocto/bin/python",
-    'obspy' : "/home/galih/miniconda3/envs/obspy/bin/python",
-}
+if sys.platform == 'win32':
+    _user_home = os.path.expanduser('~')
+    ENV_PYTHON = {
+        'pyocto': os.path.join(_user_home, 'miniconda3', 'envs', 'pyocto', 'python.exe'),
+        'obspy' : os.path.join(_user_home, 'miniconda3', 'envs', 'obspy', 'python.exe'),
+    }
+else:
+    ENV_PYTHON = {
+        'pyocto': "/home/galih/miniconda3/envs/pyocto/bin/python",
+        'obspy' : "/home/galih/miniconda3/envs/obspy/bin/python",
+    }
 
 # Ordered so "--all" and the interactive menu both run stages in the
 # pipeline's natural sequence. Each script is self-contained (reads its own
@@ -132,10 +155,34 @@ STEP_MAP = OrderedDict([
 
 def resolve_interpreter(env_name):
     """VENV_PYTHON if a project-local .venv exists (one interpreter for every
-    step), else the conda interpreter for env_name (see ENV_PYTHON)."""
-    if os.path.exists(VENV_PYTHON):
+    step), else sys.executable if running inside the target conda env, else
+    the conda interpreter for env_name (see ENV_PYTHON)."""
+    if VENV_PYTHON and os.path.exists(VENV_PYTHON):
         return VENV_PYTHON
-    return ENV_PYTHON[env_name]
+
+    # 1) If current environment matches the requested conda env
+    current_conda_env = os.environ.get('CONDA_DEFAULT_ENV', '')
+    if current_conda_env.lower() == env_name.lower():
+        return sys.executable
+    if os.path.basename(sys.prefix).lower() == env_name.lower():
+        return sys.executable
+
+    # 2) Sibling conda env in the same conda installation
+    parent_envs = os.path.dirname(sys.prefix)
+    if os.path.basename(parent_envs).lower() == 'envs':
+        if sys.platform == 'win32':
+            candidate = os.path.join(parent_envs, env_name, 'python.exe')
+        else:
+            candidate = os.path.join(parent_envs, env_name, 'bin', 'python')
+        if os.path.exists(candidate):
+            return candidate
+
+    # 3) Fallback map by platform
+    target_exe = ENV_PYTHON.get(env_name)
+    if target_exe and os.path.exists(target_exe):
+        return target_exe
+
+    return target_exe or sys.executable
 
 
 def run_step(name):

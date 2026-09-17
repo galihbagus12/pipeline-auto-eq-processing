@@ -62,7 +62,7 @@ except ImportError:
 # 2) CONFIGURATION
 # ============================================================
 
-CONFIG_YAML_PATH = "/media/galih/MyBackUp 2024/Jatim_new/config/config.yaml"
+CONFIG_YAML_PATH = str(Path(__file__).resolve().parent.parent / "config" / "config.yaml")
 
 with open(CONFIG_YAML_PATH, 'r') as _f:
     _all_cfg = yaml.safe_load(_f)

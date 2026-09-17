@@ -86,6 +86,7 @@ warnings.filterwarnings('ignore')
 
 try:
     from obspy import UTCDateTime, read
+    from obspy.geodetics import gps2dist_azimuth
 except ImportError:
     raise ImportError("Package 'obspy' is required. Run with the pyocto conda env.")
 
@@ -99,7 +100,7 @@ except ImportError:
 # 2) CONFIGURATION
 # ============================================================
 
-CONFIG_YAML_PATH = "/media/galih/MyBackUp 2024/Jatim_new/config/config.yaml"
+CONFIG_YAML_PATH = str(Path(__file__).resolve().parent.parent / "config" / "config.yaml")
 if not os.path.exists(CONFIG_YAML_PATH):
     CONFIG_YAML_PATH = str(Path(__file__).resolve().parent.parent / "config" / "config.yaml")
 
@@ -212,9 +213,9 @@ class EncoderLayer(nn.Module):
         return x
 
 
-class FocoNet_O_Model(nn.Module):
+class FocoNet_Full_Model(nn.Module):
     def __init__(self):
-        super(FocoNet_O_Model, self).__init__()
+        super(FocoNet_Full_Model, self).__init__()
         self.organize = nn.Sequential(
             nn.Linear(128, 64),
             nn.ReLU(),
@@ -231,10 +232,10 @@ class FocoNet_O_Model(nn.Module):
             nn.Linear(8, 3),
         )
         self.beg_layer = nn.Sequential(
-            nn.Linear(4, 128),
+            nn.Linear(14, 512),
             nn.ReLU(),
-            nn.LayerNorm(128),
-            nn.Linear(128, 128),
+            nn.LayerNorm(512),
+            nn.Linear(512, 128),
             nn.ReLU(),
         )
         self.beg_res1 = nn.Sequential(
@@ -286,7 +287,7 @@ class FocoNetDataset(Dataset):
     def __init__(self, data_dict):
         self.eids = list(data_dict.keys())
         self.N = len(self.eids)
-        self.polarity = np.zeros((self.N, 32, 1), dtype=np.float32)
+        self.polarity = np.zeros((self.N, 32, 11), dtype=np.float32)
         self.sta_param = np.zeros((self.N, 32, 3), dtype=np.float32)
         self.sta_num = np.zeros((self.N, 1), dtype=np.float32)
         self.sta_mask = np.zeros((self.N, 32, 1), dtype=np.float32)
@@ -301,7 +302,7 @@ class FocoNetDataset(Dataset):
             self.sta_param[j, n_sta:, 2] -= 100.0
 
             polarityPS = data_dict[eid]['polarities']
-            self.polarity[j, :n_sta, :] = polarityPS[:, :1]
+            self.polarity[j, :n_sta, :] = polarityPS[:, :11]
             self.sta_num[j, 0] = float(n_sta)
             self.sta_mask[j, :n_sta, 0] = 1.0
 
@@ -330,7 +331,7 @@ def run_foconet_predict_direct(input_dict, ckpt_path, device_str='cpu', batch_si
     if len(dataset) == 0:
         return np.empty((0, 9), dtype=np.float32)
 
-    net = FocoNet_O_Model().to(device).eval()
+    net = FocoNet_Full_Model().to(device).eval()
     
     if not ckpt.exists():
         print(f"[focmech] Warning: FocoNet checkpoint not found at {ckpt}.")
@@ -533,7 +534,70 @@ def _build_waveform_index(waveform_folder):
     return idx
 
 
-def _read_z_window(wf_idx, station, pick_time_utc, pre_s, post_s):
+_EPS = 1e-12
+
+def _get_component(stream, letter):
+    for tr in stream:
+        if tr.stats.channel and tr.stats.channel[-1].upper() == letter.upper():
+            return tr
+    return None
+
+def _max_abs_window(data, t_start, t_end, t0, sr):
+    if data is None or len(data) == 0:
+        return 0.0
+    i0 = max(0, int((t_start - t0) * sr))
+    i1 = min(len(data), int((t_end - t0) * sr))
+    if i1 <= i0:
+        return 0.0
+    return float(np.max(np.abs(data[i0:i1])))
+
+def _build_polarity_row(stream, p_time, s_time, p_half_s, s_pre_s, s_post_s, noise_pre_s, noise_post_s):
+    Z = _get_component(stream, "Z")
+    R = _get_component(stream, "R") or _get_component(stream, "N") or _get_component(stream, "1")
+    T = _get_component(stream, "T") or _get_component(stream, "E") or _get_component(stream, "2")
+    if Z is None:
+        return None
+
+    sr = float(Z.stats.sampling_rate)
+    t0 = Z.stats.starttime.timestamp
+    Rd = R.data if R is not None else None
+    Td = T.data if T is not None else None
+
+    i_p = max(0, int((p_time - t0) * sr))
+    i_end = min(len(Z.data), i_p + max(2, int(sr * p_half_s)))
+    p_window = Z.data[i_p:i_end]
+    if len(p_window) == 0 or np.max(np.abs(p_window)) < 1e-12:
+        pol = 0.0
+    else:
+        pol = float(np.sign(p_window[np.argmax(np.abs(p_window))]))
+
+    Pr = _max_abs_window(Rd,     p_time - p_half_s,   p_time + 1.0,    t0, sr)
+    Pz = _max_abs_window(Z.data, p_time - p_half_s,   p_time + 1.0,    t0, sr)
+    Sr = _max_abs_window(Rd,     s_time - s_pre_s,    s_time + s_post_s, t0, sr)
+    Sz = _max_abs_window(Z.data, s_time - s_pre_s,    s_time + s_post_s, t0, sr)
+    St = _max_abs_window(Td,     s_time - s_pre_s,    s_time + s_post_s, t0, sr)
+    Nr = _max_abs_window(Rd,     p_time - noise_pre_s, p_time - noise_post_s, t0, sr)
+    Nz = _max_abs_window(Z.data, p_time - noise_pre_s, p_time - noise_post_s, t0, sr)
+    Nt = _max_abs_window(Td,     p_time - noise_pre_s, p_time - noise_post_s, t0, sr)
+
+    max_S = max(Sr, Sz, St)
+    max_P = max(Pr, Pz, _EPS)
+
+    return np.array([
+        pol,
+        np.log10(max_S / max_P + _EPS),
+        np.log10((Sr + _EPS) / (Pr + _EPS)),
+        np.log10((Sr + _EPS) / (Pz + _EPS)),
+        np.log10((Sz + _EPS) / (Pr + _EPS)),
+        np.log10((Sz + _EPS) / (Pz + _EPS)),
+        np.log10((St + _EPS) / (Pr + _EPS)),
+        np.log10((St + _EPS) / (Pz + _EPS)),
+        np.log10((Pr + _EPS) / (Nr + _EPS)),
+        np.log10((Pz + _EPS) / (Nz + _EPS)),
+        np.log10((St + _EPS) / (Nt + _EPS)),
+    ], dtype=np.float64)
+
+def _read_3c_window(wf_idx, station, pick_time_utc, pre_s, post_s):
     pick_t = UTCDateTime(pick_time_utc.isoformat())
     d = pick_time_utc.date()
     path = wf_idx.get((station, d))
@@ -543,15 +607,17 @@ def _read_z_window(wf_idx, station, pick_time_utc, pre_s, post_s):
     if path is None:
         return None
     try:
-        st = read(str(path),
-                  starttime=pick_t - pre_s - 1.0,
-                  endtime=pick_t + post_s + 1.0)
+        st = read(str(path), starttime=pick_t - pre_s - 1.0, endtime=pick_t + post_s + 1.0)
+        st.merge(fill_value='interpolate')
     except Exception:
         return None
-    z_trs = [tr for tr in st if tr.stats.channel.upper().endswith('Z')]
+    if len(st) == 0:
+        return None
+    z_trs = [tr for tr in st if tr.stats.channel and tr.stats.channel[-1].upper() == 'Z']
     if not z_trs:
         return None
-    return z_trs[0]
+    return st
+
 
 
 def _snr_log10(data, delta, t_pick_in_window, noise_window, signal_window):
@@ -577,7 +643,7 @@ def _bandpass_copy(tr, freqmin, freqmax, zerophase=False):
     out = tr.copy()
     try:
         out.detrend('demean')
-        out.detrend('linear')
+        out.detrend('simple')
         out.taper(0.05, type='cosine')
         out.filter('bandpass', freqmin=freqmin, freqmax=freqmax,
                    corners=4, zerophase=zerophase)
@@ -586,15 +652,26 @@ def _bandpass_copy(tr, freqmin, freqmax, zerophase=False):
     return out
 
 
-def extract_event_observations(event_row, p_picks_df, stations_df, wf_idx, cfg):
-    bp_lo = cfg['bandpass_polarity'][0]
-    bp_hi = cfg['bandpass_polarity'][1]
-    noise_window = tuple(cfg['noise_window'])
-    signal_window = tuple(cfg['p_amp_window'])
-    pre_s = float(cfg['pre_pick_s'])
-    post_s = float(cfg['post_pick_s'])
-    pol_search_s = float(cfg['polarity_search_s'])
-    pol_aic_window_s = float(cfg['polarity_aic_window_s'])
+def extract_event_observations(event_row, event_phases_df, stations_df, wf_idx, cfg):
+    bp_lo = float(cfg.get('bandpass_polarity', [1.0, 10.0])[0])
+    bp_hi = float(cfg.get('bandpass_polarity', [1.0, 10.0])[1])
+    noise_window = tuple(cfg.get('noise_window', [-5.0, -2.0]))
+    pre_s = float(cfg.get('pre_pick_s', 6.0))
+    post_s = float(cfg.get('post_pick_s', 4.0))
+    vp_km_s = float(cfg.get('vp_km_s', 6.0))
+    vs_km_s = float(cfg.get('vs_km_s', 3.47))
+    
+    p_half_s = float(cfg.get('p_half_s', 0.05))
+    s_pre_s = float(cfg.get('s_pre_s', 0.05))
+    s_post_s = float(cfg.get('s_post_s', 2.0))
+    noise_pre_s = float(cfg.get('noise_pre_s', 2.0))
+    noise_post_s = float(cfg.get('noise_post_s', 0.2))
+
+    p_picks_df = event_phases_df[event_phases_df['phase'] == 'P']
+    s_picks = event_phases_df[event_phases_df['phase'] == 'S'].set_index('station')
+
+    ev_lat = float(event_row['latitude'])
+    ev_lon = float(event_row['longitude'])
 
     observations = []
     for _, pick_row in p_picks_df.iterrows():
@@ -602,39 +679,56 @@ def extract_event_observations(event_row, p_picks_df, stations_df, wf_idx, cfg):
         if sta not in stations_df.index:
             continue
         sta_info = stations_df.loc[sta]
+        sta_lat = float(sta_info['latitude'])
+        sta_lon = float(sta_info['longitude'])
+        
         pick_time_utc = pick_row['pick_time']
-        pre_req = max(pre_s, abs(noise_window[0]) + 1.0)
-        tr_raw = _read_z_window(wf_idx, sta, pick_time_utc, pre_req, post_s)
-        if tr_raw is None:
-            continue
-        tr_pol = _bandpass_copy(tr_raw, bp_lo, bp_hi, zerophase=False)
-        if tr_pol is None:
-            continue
-        delta_pol = tr_pol.stats.delta
-        t_pick_pol = float(UTCDateTime(pick_time_utc.isoformat()) - tr_pol.stats.starttime)
-        t_refined = aic_refine_pick(tr_pol.data, delta_pol, t_pick_pol,
-                                    window_s=pol_aic_window_s)
-        polarity, polarity_conf = ensemble_polarity(
-            tr_pol.data, delta_pol, t_refined,
-            polarity_lo_hz=bp_lo,
-            search_s=pol_search_s,
-        )
-        tr_amp = _bandpass_copy(tr_raw, bp_lo, bp_hi, zerophase=True)
-        if tr_amp is None:
-            snr_pz = 0.0
+        p_time = UTCDateTime(pick_time_utc.isoformat()).timestamp
+        
+        dist_m, az, baz = gps2dist_azimuth(ev_lat, ev_lon, sta_lat, sta_lon)
+        dist_km = dist_m / 1000.0
+
+        if sta in s_picks.index:
+            s_time_utc = s_picks.loc[sta]['pick_time']
+            if isinstance(s_time_utc, pd.Series):
+                s_time_utc = s_time_utc.iloc[0]
+            s_time = UTCDateTime(s_time_utc.isoformat()).timestamp
         else:
-            delta_amp = tr_amp.stats.delta
-            t_pick_amp = float(UTCDateTime(pick_time_utc.isoformat()) - tr_amp.stats.starttime)
-            snr_pz = _snr_log10(tr_amp.data, delta_amp, t_pick_amp,
-                                 noise_window, signal_window)
+            s_time = p_time + dist_km * (1.0 / vs_km_s - 1.0 / vp_km_s)
+            
+        pre_req = max(pre_s, noise_pre_s + 2.0, abs(noise_window[0]) + 1.0)
+        post_req = max(post_s, (s_time - p_time) + s_post_s + 3.0)
+
+        st_raw = _read_3c_window(wf_idx, sta, pick_time_utc, pre_req, post_req)
+        if st_raw is None:
+            continue
+            
+        st_pol = st_raw.copy()
+        try:
+            st_pol.detrend('demean')
+            st_pol.detrend('simple')
+            st_pol.taper(0.05, type='cosine')
+            st_pol.filter('bandpass', freqmin=bp_lo, freqmax=bp_hi, corners=4, zerophase=False)
+            try:
+                st_pol.rotate("NE->RT", back_azimuth=baz)
+            except Exception:
+                pass
+        except Exception:
+            continue
+            
+        pol_row = _build_polarity_row(st_pol, p_time, s_time, p_half_s, s_pre_s, s_post_s, noise_pre_s, noise_post_s)
+        if pol_row is None:
+            continue
+
         observations.append({
             'station': sta,
-            'latitude': float(sta_info['latitude']),
-            'longitude': float(sta_info['longitude']),
+            'latitude': sta_lat,
+            'longitude': sta_lon,
             'elevation_m': float(sta_info['elevation_m']),
-            'polarity': polarity,
-            'polarity_conf': polarity_conf,
-            'snr_pz': snr_pz,
+            'polarity': pol_row[0],
+            'polarity_conf': 1.0 if pol_row[0] != 0 else 0.0,
+            'snr_pz': pol_row[9],
+            'features': pol_row,
         })
     return observations
 
@@ -655,7 +749,7 @@ def build_foconet_input(events_obs, depth_min_km=0.0, depth_max_km=100.0):
         depth_use = float(np.clip(ev['depth_km'], depth_min_km, depth_max_km))
         obs = ev['observations']
         n_sta = min(len(obs), MAX_STATIONS)
-        polarities = np.zeros((n_sta, 1), dtype=np.float32)
+        polarities = np.zeros((n_sta, 11), dtype=np.float32)
         stationxyz = np.empty((n_sta, 4), dtype=object)
         for i, o in enumerate(obs[:n_sta]):
             x_km, y_km = _project_xy_km(o['latitude'], o['longitude'],
@@ -664,7 +758,11 @@ def build_foconet_input(events_obs, depth_min_km=0.0, depth_max_km=100.0):
             stationxyz[i, 1] = float(x_km)
             stationxyz[i, 2] = float(y_km)
             stationxyz[i, 3] = depth_use
-            polarities[i, 0] = float(o['polarity'])
+            if 'features' in o:
+                polarities[i, :] = o['features']
+                polarities[i, 0] = float(o['polarity'])
+            else:
+                polarities[i, 0] = float(o['polarity'])
         out[ev['event_id']] = {
             'polarities': polarities,
             'stationxyz': stationxyz,
@@ -710,6 +808,31 @@ def _lower_hemisphere(axis):
     return float(r * np.sin(azimuth)), float(r * np.cos(azimuth))
 
 
+
+def _add_coastline(ax, lon_min, lon_max, lat_min, lat_max):
+    try:
+        import cartopy.io.shapereader as shpreader
+        from shapely.geometry import box
+    except ImportError:
+        return
+    try:
+        shp = shpreader.natural_earth(resolution='10m', category='physical', name='coastline')
+        reader = shpreader.Reader(shp)
+        bbox = box(lon_min, lat_min, lon_max, lat_max)
+        for geom in reader.geometries():
+            if not geom.intersects(bbox):
+                continue
+            inter = geom.intersection(bbox)
+            if inter.geom_type == 'LineString':
+                x, y = inter.xy
+                ax.plot(x, y, color='dimgray', lw=0.8, zorder=1)
+            elif inter.geom_type == 'MultiLineString':
+                for line in inter.geoms:
+                    x, y = line.xy
+                    ax.plot(x, y, color='dimgray', lw=0.8, zorder=1)
+    except Exception as e:
+        print('[focmech] Error drawing coastline:', e)
+
 def plot_focal_mechanisms(df, stations_df, out_path, plane=1, pad=0.02):
     if beach is None:
         print("[focmech] obspy.imaging.beachball not available; skipping beachball map.")
@@ -753,6 +876,7 @@ def plot_focal_mechanisms(df, stations_df, out_path, plane=1, pad=0.02):
     ax_map.set_ylim(lat_min, lat_max)
     ax_map.set_xlabel('Longitude (°E)')
     ax_map.set_ylabel('Latitude (°N)')
+    _add_coastline(ax_map, lon_min, lon_max, lat_min, lat_max)
     ax_map.set_title(f'Focal mechanisms (plane {plane}) — {len(df)} events')
     ax_map.set_aspect(1.0 / np.cos(np.radians(0.5 * (lat_min + lat_max))))
     ax_map.legend(handles=legend_handles, loc='upper right', fontsize=8)
@@ -854,6 +978,7 @@ def _draw_cross_map(ax, df, stations_df, lines, axis_label, bb_size_deg, plane, 
     ax.set_ylim(lat_lo, lat_hi)
     ax.set_xlabel('Longitude (°E)', fontsize=9)
     ax.set_ylabel('Latitude (°N)', fontsize=9)
+    _add_coastline(ax, lon_lo, lon_hi, lat_lo, lat_hi)
     ax.set_title(f'Map view ({axis_label})', fontsize=10)
     ax.tick_params(labelsize=8)
     ax.grid(lw=0.3, alpha=0.5)
@@ -1263,7 +1388,7 @@ def main():
             continue
         obs = extract_event_observations(
             event_row=ev_row,
-            p_picks_df=ev_p_picks,
+            event_phases_df=phases_df[phases_df['event_id'] == ev_id],
             stations_df=stations_df,
             wf_idx=wf_idx,
             cfg=CONFIG,
@@ -1344,7 +1469,7 @@ def main():
             'Px': float(pt[0]), 'Py': float(pt[1]), 'Pz': float(pt[2]),
             'Tx': float(pt[3]), 'Ty': float(pt[4]), 'Tz': float(pt[5]),
             'Bx': float(pt[6]), 'By': float(pt[7]), 'Bz': float(pt[8]),
-            'variant': 'O',
+            'variant': CONFIG.get('variant', 'Full'),
         })
 
     df_out = pd.DataFrame(rows)
