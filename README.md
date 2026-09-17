@@ -87,8 +87,7 @@ output/focal_mechanism/plots/*.png
    waveforms for relocated events. Computes Kagan angles between all event pairs
    and plots focal mechanisms (beachballs).
 
-See `CLAUDE.md` for the full architecture reference (per-stage config keys,
-derived-parameter formulas, QC rationale) and `ASSOCIATION_QC.md` for a
+See `ASSOCIATION_QC.md` for a
 narrative walkthrough of the association → QC → catalogue chain.
 
 ## Configuration
