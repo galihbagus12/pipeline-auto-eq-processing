@@ -209,3 +209,7 @@ the underlying tools:
   (1987), *The ML scale in southern California*, BSSA.
 - **ObsPy** — M. Beyreuther et al. (2010), *ObsPy: A Python toolbox for
   seismology*, Seismological Research Letters.
+
+## Results
+
+![End-to-End Automated Seismic Processing Pipeline Map Result](figure/focmechmerge_event.png)
